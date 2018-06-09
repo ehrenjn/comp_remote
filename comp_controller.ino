@@ -1,12 +1,18 @@
-//STILL WANT TO TEST MAXIMUM READ SPEED TO MAKE SURE I CAN GET EVERY BIT
-
 int INPUT_PIN = 2;
 
-long HEADER = 432;
-long UP =     2323222;
-long DOWN =   3332232; 
-long LEFT =   3323232;
-long RIGHT =  3323322;
+long HEADER = 43;
+
+long UP =     22323222;
+long DOWN =   23332232; 
+long LEFT =   23323232;
+long RIGHT =  23323322;
+
+long UP_RIGHT = 23222322;
+long UP_LEFT = 23222232;
+long DOWN_LEFT = 23332322;
+long DOWN_RIGHT = 32232332; 
+
+long RELEASE = 23322332;
 
 
 long duration(long t1, long t2) { //returns the microseconds between t1 and t2, accounting for overflow
@@ -74,7 +80,7 @@ class IR_Data { //Represents a sequence of information from the IR reciever
     long last_time = wait_for_bit_change(); //wait for beginning of start bit
     bool next_bit = (bool) digitalRead(input_pin); //this should always be a 1, but just in case lets do a read
     while (len < digits) {
-      long current_time = wait_for_bit_change();
+      long current_time = wait_for_bit_change(); //(it takes < 10 microseconds to get back to this line once a bit change is detected. Good time!)
       bool success = add_bits(last_time, current_time, next_bit);
       if (!success) { //return false if something went wrong
         return false;
@@ -88,7 +94,7 @@ class IR_Data { //Represents a sequence of information from the IR reciever
   void wait_for_silence() { //waits for 3 milliseconds of no ir data
     long start = micros();
     while (micros() < start + 3000) {
-      if (digitalRead(input_pin) == 1) {
+      if (digitalRead(input_pin) == 1) { //restart the waiting if any data comes through
         start = micros();
       }
     }
@@ -105,22 +111,24 @@ void setup() {
 }
 
 
-void send_press(long data) {
-  if (data == UP) {
+void send_press(long data) { //(takes ~30 microseconds now that I added the extra stuff... not great but I wait for silence after this so it doesn't matter)
+  if (data == UP || data == UP_RIGHT || data == UP_LEFT) {
     Serial.print('u');
-  } else if (data == DOWN) {
+  } if (data == DOWN || data == DOWN_RIGHT || data == DOWN_LEFT) {
     Serial.print('d');
-  } else if (data == LEFT) {
+  } if (data == LEFT || data == DOWN_LEFT || data == UP_LEFT) {
     Serial.print('l');
-  } else if (data == RIGHT) {
+  } if (data == RIGHT || data == DOWN_RIGHT || data == UP_RIGHT) {
     Serial.print('r');
-  } 
+  } if (data == RELEASE) {
+    Serial.print('^');
+  }
 }
 
 void loop() {
-  bool success = IRR.get_data(3);
+  bool success = IRR.get_data(2); //(after this line it takes ~12 microseconds to check success && headers, reset data and start looking for a bit change agian. Good time!)
   if (success && IRR.data == HEADER) {
-    success = IRR.get_data(7);
+    success = IRR.get_data(8);
     if (success) {
       send_press(IRR.data);
     }
