@@ -10,12 +10,11 @@ def make_tap(key):
         win.keybd_event(key, 0, 2, 0)
     return tap
 
-def mode_switch():
-    global buttons
-    if buttons == keyboard_mapping:
-        buttons = mouse_mapping
-    else:
-        buttons = keyboard_mapping
+def make_scroll(direction):
+    amt = 50 * direction
+    def scroll():
+        win.mouse_event(0x0800, 0, 0, amt)
+    return scroll
 
 def get_port():
     for p in xrange(256):
@@ -78,23 +77,39 @@ class Mouse(object):
         return Action(move, **action_params)
     
 
-keyboard_mapping = {
-    'd': Action(make_tap(174)),
-    'u': Action(make_tap(175)),
-    'l': Action(make_tap(32), False),
-    'r': Action(mode_switch),
-    '^': Action(Action.reset_all)
-}
+class MODE(object):
+    def mode_switcher(mode_name):
+        def switch():
+            MODE.buttons = MODE.modes[mode_name]
+        return switch
+    
+    modes = {
+        'keyboard': {
+            'd': Action(make_tap(174)),
+            'u': Action(make_tap(175)),
+            'l': Action(make_tap(32), False),
+            'r': Action(mode_switcher('mouse')),
+            '^': Action(Action.reset_all)
+        },
 
-mouse_mapping = {
-    'd': Mouse.make_action((0, 1)),
-    'u': Mouse.make_action((0, -1)),
-    'l': Mouse.make_action((-1, 0), on_hold = mode_switch),
-    'r': Mouse.make_action((1, 0), clicky = True),
-    '^': Action(Action.reset_all)
-}
+        'mouse': {
+            'd': Mouse.make_action((0, 1), on_hold = mode_switcher('scroll')),
+            'u': Mouse.make_action((0, -1)),
+            'l': Mouse.make_action((-1, 0), on_hold = mode_switcher('keyboard')),
+            'r': Mouse.make_action((1, 0), clicky = True),
+            '^': Action(Action.reset_all)
+        },
 
-buttons = mouse_mapping #keyboard_mapping
+        'scroll': {
+            'd': Action(make_scroll(-1)),
+            'u': Action(make_scroll(1)),
+            'l': Action(mode_switcher('keyboard')),
+            'r': Action(mode_switcher('mouse')),
+            '^': Action(Action.reset_all)
+        }
+    }
+
+    buttons = modes['mouse']
 
 
 port = get_port()
@@ -102,8 +117,8 @@ print port
 while 1:
     data = port.readline()
     for char in data:
-        if char in buttons:
-            buttons[char].trigger()
+        if char in MODE.buttons:
+            MODE.buttons[char].trigger()
     if abs(win.GetKeyState(67)) > 1:
         break
 
